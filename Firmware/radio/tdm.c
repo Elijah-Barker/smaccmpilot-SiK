@@ -144,7 +144,6 @@ __pdata struct tdm_trailer trailer;
 
 /// buffer to hold a remote AT command before sending
 static bool send_at_command;
-static __pdata char remote_at_cmd[AT_CMD_MAXLEN + 1];
 
 /// display RSSI output
 ///
@@ -425,47 +424,6 @@ link_update(void)
 	}
 }
 
-// dispatch an AT command to the remote system
-void
-tdm_remote_at(void)
-{
-	memcpy(remote_at_cmd, at_cmd, strlen(at_cmd)+1);
-	send_at_command = true;
-}
-
-// handle an incoming at command from the remote radio
-static void
-handle_at_command(__pdata uint8_t len)
-{
-	if (len < 2 || len > AT_CMD_MAXLEN || 
-	    pbuf[0] != (uint8_t)'R' || 
-	    pbuf[1] != (uint8_t)'T') {
-		// assume its an AT command reply
-		register uint8_t i;
-		for (i=0; i<len; i++) {
-			putchar(pbuf[i]);
-		}
-		return;
-	}
-
-	// setup the command in the at_cmd buffer
-	memcpy(at_cmd, pbuf, len);
-	at_cmd[len] = 0;
-	at_cmd[0] = 'A'; // replace 'R'
-	at_cmd_len = len;
-	at_cmd_ready = true;
-
-	// run the AT command, capturing any output to the packet
-	// buffer
-	// this reply buffer will be sent at the next opportunity
-	printf_start_capture(pbuf, sizeof(pbuf));
-	at_command();
-	len = printf_end_capture();
-	if (len > 0) {
-		packet_inject(pbuf, len);
-	}
-}
-
 // a stack carary to detect a stack overflow
 __at(0xFF) uint8_t __idata _canary;
 
@@ -551,9 +509,7 @@ tdm_serial_loop(void)
 				sync_tx_windows(len);
 				last_t = tnow;
 
-				if (trailer.command == 1) {
-					handle_at_command(len);
-				} else if (len != 0 && 
+				if (len != 0 && 
 					   !packet_is_duplicate(len, pbuf, trailer.resend) &&
 					   !at_mode_active) {
 					// its user data - send it out
@@ -658,19 +614,9 @@ tdm_serial_loop(void)
 			max_xmit = max_data_packet_length;
 		}
 
-		// ask the packet system for the next packet to send
-		if (send_at_command && 
-		    max_xmit >= strlen(remote_at_cmd)) {
-			// send a remote AT command
-			len = strlen(remote_at_cmd);
-			memcpy(pbuf, remote_at_cmd, len);
-			trailer.command = 1;
-			send_at_command = false;
-		} else {
-			// get a packet from the serial port
-			len = packet_get_next(max_xmit, pbuf);
-			trailer.command = packet_is_injected();
-		}
+		// get a packet from the serial port
+		len = packet_get_next(max_xmit, pbuf);
+		trailer.command = 0;
 
 		if (len > max_data_packet_length) {
 			panic("oversized tdm packet");
