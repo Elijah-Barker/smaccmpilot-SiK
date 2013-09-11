@@ -54,41 +54,10 @@ static __bit unsigned_flag = 0;
 static char * __data str;
 static __data long val;
 
-// allow printf() output to be captured to a buffer
-// for remote AT command control
-static bool capture;
-static __xdata uint8_t *capture_buffer;
-static __pdata uint8_t capture_buffer_size;
-static __pdata uint8_t captured_size;
-
-static void 
+static void
 output_char(register char c)
 {
-	if (!capture) {
-		putchar(c);
-		return;
-	}
-	if (captured_size < capture_buffer_size) {
-		capture_buffer[captured_size++] = c;
-	}
-}
-
-// start capturing bytes from printf()
-void 
-printf_start_capture(__xdata uint8_t *buf, uint8_t size)
-{
-	capture_buffer = buf;
-	captured_size = 0;
-	capture_buffer_size = size;
-	capture = true;
-}
-
-// end capture, returning number of bytes that have been captured
-uint8_t 
-printf_end_capture(void)
-{
-	capture = false;
-	return captured_size;
+	putchar(c);
 }
 
 void 
