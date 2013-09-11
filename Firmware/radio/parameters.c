@@ -153,8 +153,6 @@ param_set(__data enum ParamID param, __pdata param_t value)
 		break;
 
 	case PARAM_MAVLINK:
-		feature_mavlink_framing = value?true:false;
-		value = feature_mavlink_framing?1:0;
 		break;
 
 	case PARAM_OPPRESEND:

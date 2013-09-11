@@ -61,85 +61,10 @@ static __pdata uint16_t mav_pkt_max_time;
 
 static __pdata uint8_t mav_max_xmit;
 
-// have we seen a mavlink packet?
-bool seen_mavlink;
-bool using_mavlink_10;
-
 #define PACKET_RESEND_THRESHOLD 32
 
 #define MAVLINK09_STX 85 // 'U'
 #define MAVLINK10_STX 254
-
-// check if a buffer looks like a MAVLink heartbeat packet - this
-// is used to determine if we will inject RADIO status MAVLink
-// messages into the serial stream for ground station and aircraft
-// monitoring of link quality
-static void check_heartbeat(__xdata uint8_t * __pdata buf)
-{
-	if (buf[0] == MAVLINK09_STX &&
-	    buf[1] == 3 && buf[5] == 0) {
-		// looks like a MAVLink 0.9 heartbeat
-		using_mavlink_10 = false;
-		seen_mavlink = true;
-	} else if (buf[0] == MAVLINK10_STX &&
-		   buf[1] == 9 && buf[5] == 0) {
-		// looks like a MAVLink 1.0 heartbeat
-		using_mavlink_10 = true;
-		seen_mavlink = true;
-	}
-}
-
-// return a complete MAVLink frame, possibly expanding
-// to include other complete frames that fit in the max_xmit limit
-static 
-uint8_t mavlink_frame(uint8_t max_xmit, __xdata uint8_t * __pdata buf)
-{
-	__data uint16_t slen;
-
-	serial_read_buf(last_sent, mav_pkt_len);
-	last_sent_len = mav_pkt_len;
-	memcpy(buf, last_sent, last_sent_len);
-	mav_pkt_len = 0;
-
-	check_heartbeat(buf);
-
-	slen = serial_read_available();
-
-	// see if we have more complete MAVLink frames in the serial
-	// buffer that we can fit in this packet
-	while (slen >= 8) {
-		register uint8_t c = serial_peek();
-		if (c != MAVLINK09_STX && c != MAVLINK10_STX) {
-			// its not a MAVLink packet
-			return last_sent_len;			
-		}
-		c = serial_peek2();
-		if (c >= 255 - 8 || 
-		    c+8 > max_xmit - last_sent_len) {
-			// it won't fit
-			break;
-		}
-		if (c+8 > slen) {
-			// we don't have the full MAVLink packet in
-			// the serial buffer
-			break;
-		}
-
-		c += 8;
-
-		// we can add another MAVLink frame to the packet
-		serial_read_buf(&last_sent[last_sent_len], c);
-		memcpy(&buf[last_sent_len], &last_sent[last_sent_len], c);
-
-		check_heartbeat(buf+last_sent_len);
-
-		last_sent_len += c;
-		slen -= c;
-	}
-
-	return last_sent_len;
-}
-
 
 // return the next packet to be sent
 uint8_t
@@ -177,114 +102,15 @@ packet_get_next(register uint8_t max_xmit, __xdata uint8_t * __pdata buf)
 		return 0;
 	}
 
-	if (!feature_mavlink_framing) {
-		// simple framing
-		if (slen > 0 && serial_read_buf(buf, slen)) {
-			memcpy(last_sent, buf, slen);
-			last_sent_len = slen;
-		} else {
-			last_sent_len = 0;
-		}
-		return last_sent_len;
+	// simple framing
+	if (slen > 0 && serial_read_buf(buf, slen)) {
+		memcpy(last_sent, buf, slen);
+		last_sent_len = slen;
+	} else {
+		last_sent_len = 0;
 	}
-
-	// try to align packet boundaries with MAVLink packets
-
-	if (mav_pkt_len == 1) {
-		// we're waiting for the MAVLink length byte
-		if (slen == 1) {
-			if ((uint16_t)(timer2_tick() - mav_pkt_start_time) > mav_pkt_max_time) {
-				// we didn't get the length byte in time
-				last_sent[last_sent_len++] = serial_read();
-				memcpy(buf, last_sent, last_sent_len);				
-				mav_pkt_len = 0;
-				return last_sent_len;
-			}
-			// still waiting ....
-			return 0;
-		}
-		// we have more than one byte, use normal packet frame
-		// detection below
-		mav_pkt_len = 0;
-	}
-
-
-	if (mav_pkt_len != 0) {
-		if (slen < mav_pkt_len) {
-			if ((uint16_t)(timer2_tick() - mav_pkt_start_time) > mav_pkt_max_time) {
-				// timeout waiting for the rest of
-				// it. Send what we have now.
-				serial_read_buf(last_sent, slen);
-				last_sent_len = slen;
-				memcpy(buf, last_sent, last_sent_len);
-				mav_pkt_len = 0;
-				return last_sent_len;
-			}
-			// leave it in the serial buffer till we have the
-			// whole MAVLink packet			
-			return 0;
-		}
-		
-		// the whole of the MAVLink packet is available
-		return mavlink_frame(max_xmit, buf);
-	}
-		
-	while (slen > 0) {
-		register uint8_t c = serial_peek();
-		if (c == MAVLINK09_STX || c == MAVLINK10_STX) {
-			if (slen == 1) {
-				// we got a bare MAVLink header byte
-				if (last_sent_len == 0) {
-					// wait for the next byte to
-					// give us the length
-					mav_pkt_len = 1;
-					mav_pkt_start_time = timer2_tick();
-					mav_pkt_max_time = serial_rate;
-					return 0;
-				}
-				break;
-			}
-			mav_pkt_len = serial_peek2();
-			if (mav_pkt_len >= 255-8 ||
-			    mav_pkt_len+8 > mav_max_xmit) {
-				// its too big for us to cope with
-				mav_pkt_len = 0;
-				last_sent[last_sent_len++] = serial_read();
-				slen--;				
-				continue;
-			}
-
-			// the length byte doesn't include
-			// the header or CRC
-			mav_pkt_len += 8;
-			
-			if (last_sent_len != 0) {
-				// send what we've got so far,
-				// and send the MAVLink payload
-				// in the next packet
-				memcpy(buf, last_sent, last_sent_len);
-				mav_pkt_start_time = timer2_tick();
-				mav_pkt_max_time = mav_pkt_len * serial_rate;
-				return last_sent_len;
-			} else if (mav_pkt_len > slen) {
-				// the whole MAVLink packet isn't in
-				// the serial buffer yet. 
-				mav_pkt_start_time = timer2_tick();
-				mav_pkt_max_time = mav_pkt_len * serial_rate;
-				return 0;					
-			} else {
-				// the whole packet is there
-				// and ready to be read
-				return mavlink_frame(max_xmit, buf);
-			}
-		} else {
-			last_sent[last_sent_len++] = serial_read();
-			slen--;
-		}
-	}
-
-	memcpy(buf, last_sent, last_sent_len);
 	return last_sent_len;
+
 }
 
 // return true if the packet currently being sent

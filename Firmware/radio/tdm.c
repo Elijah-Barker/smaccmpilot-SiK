@@ -131,9 +131,6 @@ __pdata uint8_t test_display;
 /// set when we should send a statistics packet on the next round
 static __bit send_statistics;
 
-/// set when we should send a MAVLink report pkt
-extern bool seen_mavlink;
-
 struct tdm_trailer {
 	uint16_t window:13;
 	uint16_t command:1;
@@ -457,11 +454,6 @@ tdm_serial_loop(void)
 		if (test_display) {
 			display_test_output();
 			test_display = 0;
-		}
-
-		if (seen_mavlink && feature_mavlink_framing && !at_mode_active) {
-			seen_mavlink = false;
-			MAVLink_report();
 		}
 
 		// set right receive channel
