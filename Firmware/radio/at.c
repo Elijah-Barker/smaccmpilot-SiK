@@ -34,7 +34,7 @@
 
 #include "radio.h"
 #include "tdm.h"
-
+#include "hxstream.h"
 
 // canary data for ram wrap. It is in at.c as the compiler
 // assigns addresses in alphabetial order and we want this at a low
@@ -219,7 +219,7 @@ at_command(void)
 		}
 		
 		if ((at_cmd_len >= 2) && (at_cmd[0] == 'A') && (at_cmd[1] == 'T')) {
-
+			hxstream_term_begin_frame();
 			// look at the next byte to determine what to do
 			switch (at_cmd[2]) {
 			case '\0':		// no command -> OK
@@ -256,6 +256,7 @@ at_command(void)
 		// unlock the command buffer
 		at_cmd_len = 0;
 		at_cmd_ready = false;
+		hxstream_term_end_frame();
 	}
 }
 

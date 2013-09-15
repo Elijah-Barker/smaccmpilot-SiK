@@ -1,6 +1,6 @@
 // -*- Mode: C; c-basic-offset: 8; -*-
 //
-// Copyright (c) 2011 Michael Smith, All Rights Reserved
+// Copyright (c) 2013 Pat Hickey, Galois Inc. All Rights Reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,31 +26,22 @@
 // OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-///
-/// @file	serial.h
-///
-/// Serial port driver with flow control and AT command
-/// parser integration.
-///
-
-#ifndef _SERIAL_H_
-#define _SERIAL_H_
+#ifndef __HXSTREAM_H__
+#define __HXSTREAM_H__
 
 #include <stdint.h>
-#include "radio.h"
+#include <stdbool.h>
 
-/// Initialise the serial port.
-///
-/// @param	speed		The serial speed to configure, passed
-///				to serial_device_set_speed at the appropriate
-///				point during initialisation.
-///
-extern void	serial_init(register uint8_t speed);
+bool hxstream_rx_handler (uint8_t c);
+bool hxstream_tx_handler (void);
+void hxstream_init       (void);
 
-/// check if a serial speed is valid
-///
-/// @param	speed		The serial speed to configure
-///
-extern bool serial_device_valid_speed(register uint8_t speed);
+void hxstream_write_frame (__xdata uint8_t* __data buf, __pdata uint8_t count);
+bool hxstream_read_frame  (__xdata uint8_t* __data buf, __pdata uint8_t count);
+uint8_t hxstream_read_available (void);
 
-#endif // _SERIAL_H_
+void hxstream_term_begin_frame (void);
+void hxstream_term_end_frame (void);
+void hxstream_term_putchar(char c);
+
+#endif // __HXSTREAM_H__

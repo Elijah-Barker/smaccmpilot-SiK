@@ -41,6 +41,7 @@
 #include "golay.h"
 #include "freq_hopping.h"
 #include "crc.h"
+#include "hxstream.h"
 
 #define USE_TICK_YIELD 1
 
@@ -508,7 +509,7 @@ tdm_serial_loop(void)
 					// the serial port
 					//printf("rcv(%d,[", len);
 					LED_ACTIVITY = LED_ON;
-					serial_write_buf(pbuf, len);
+					hxstream_write_frame(pbuf, len);
 					LED_ACTIVITY = LED_OFF;
 					//printf("]\n");
 				}

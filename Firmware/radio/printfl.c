@@ -45,6 +45,7 @@
  %s        character           generic pointer
  */
 #include "radio.h"
+#include "hxstream.h"
 
 static __data char radix;
 static __bit long_flag = 0;
@@ -54,10 +55,14 @@ static __bit unsigned_flag = 0;
 static char * __data str;
 static __data long val;
 
+void putchar(char c) {
+    hxstream_term_putchar(c);
+}
+
 static void
 output_char(register char c)
 {
-	putchar(c);
+	hxstream_term_putchar(c);
 }
 
 void 

@@ -1,0 +1,321 @@
+// -*- Mode: C; c-basic-offset: 8; -*-
+//
+// Copyright (c) 2011 Michael Smith, All Rights Reserved
+// Copyright (c) 2013 Pat Hickey, Galois Inc, All Rights Reserved
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//
+//  o Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  o Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in
+//    the documentation and/or other materials provided with the distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+// FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+// COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+// INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+// HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+// OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+
+#include <string.h>
+#include "board.h"
+#include "hxstream.h"
+
+#define HX_FBO 0x7e // '~'
+#define HX_CEO 0x7c // '|'
+#define HX_ESC(_x) (_x^0x20)
+
+#define HX_STATE_IDLE    0
+#define HX_STATE_FSTART  1
+#define HX_STATE_DATA    2
+#define HX_STATE_ESC     3
+
+#define TERM_STATE_IDLE  0
+#define TERM_STATE_WRITE 1
+#define TERM_STATE_READY 2
+#define TERM_STATE_TXING 3
+
+
+// FIFO status
+#define BUF_FULL(_which) (((_which##_insert + 1) & _which##_mask) == (_which##_remove))
+#define BUF_NOT_FULL(_which) (((_which##_insert + 1) & _which##_mask) != (_which##_remove))
+#define BUF_EMPTY(_which) (_which##_insert == _which##_remove)
+#define BUF_NOT_EMPTY(_which) (_which##_insert != _which##_remove)
+#define BUF_USED(_which) ((_which##_insert - _which##_remove) & _which##_mask)
+#define BUF_FREE(_which) ((_which##_remove - _which##_insert - 1) & _which##_mask)
+
+// FIFO insert/remove operations
+//
+// Note that these are nominally interrupt-safe as only one of each
+// buffer's end pointer is adjusted by either of interrupt or regular
+// mode code.  This is violated if printing from interrupt context,
+// which should generally be avoided when possible.
+//
+#define BUF_INSERT(_which) do {  \
+        _which##_insert = ((_which##_insert+1) & _which##_mask); } while(0)
+#define BUF_AT_INSERT(_which) &((_which##_buf)[_which##_insert])
+#define BUF_REMOVE(_which) do { \
+        _which##_remove = ((_which##_remove+1) & _which##_mask); } while(0)
+#define BUF_AT_REMOVE(_which) &((_which##_buf)[_which##_remove])
+
+struct frame {
+	uint8_t len;
+	uint8_t data[128];
+};
+
+struct frame_builder {
+    uint8_t state;
+    uint8_t id;
+    uint8_t offs;
+};
+
+#define TX_PUT(c) do { SBUF0 = c; } while (0)
+
+//----------------------------------------------------------------------------
+
+// NUM_xx_FRAMES must be a power of 2 so that masking works:
+#define NUM_RX_FRAMES 16
+#define NUM_TX_FRAMES 4
+
+__xdata static struct frame_builder rx_fbuilder;
+__xdata static struct frame         rx_buf[NUM_RX_FRAMES];
+__pdata static const  uint16_t      rx_mask = NUM_RX_FRAMES - 1;
+__pdata static volatile uint16_t    rx_insert, rx_remove;
+
+__xdata static struct frame_builder tx_fbuilder;
+__xdata static struct frame         tx_buf[NUM_TX_FRAMES];
+__pdata static const  uint16_t      tx_mask = NUM_TX_FRAMES - 1;
+__pdata static volatile uint16_t    tx_insert, tx_remove;
+
+__xdata static struct frame         tx_term;
+__pdata static uint8_t              tx_term_state;
+
+static void init_frame_builder(struct frame_builder *fb);
+static bool frame_rx (uint8_t c, struct frame* f, struct frame_builder* fb);
+static bool frame_tx (struct frame *f, struct frame_builder *fb);
+
+void hxstream_init (void) {
+	init_frame_builder(&rx_fbuilder);
+	rx_insert = 0;
+	rx_remove = 0;
+
+	init_frame_builder(&tx_fbuilder);
+	tx_insert = 0;
+	tx_remove = 0;
+
+	tx_term_state = TERM_STATE_IDLE;
+}
+
+static void init_frame_builder(struct frame_builder *fb) {
+	fb->state = HX_STATE_IDLE;
+	fb->id = 0;
+	fb->offs = 0;
+}
+
+bool hxstream_rx_handler(uint8_t c) {
+	struct frame *rx_frame;
+	if (BUF_NOT_FULL(rx)) {
+	rx_frame = BUF_AT_INSERT(rx);
+		if (frame_rx(c, rx_frame, &rx_fbuilder)) {
+			BUF_INSERT(rx);
+			init_frame_builder(&rx_fbuilder);
+		}
+		return true;
+	}
+	return false;
+}
+
+static bool frame_rx (uint8_t c, struct frame* f, struct frame_builder* fb) {
+	switch (fb->state) {
+		case HX_STATE_IDLE:
+			if (c == HX_FBO) {
+				fb->state = HX_STATE_FSTART;
+			}
+			break;
+
+		case HX_STATE_FSTART:
+			if (c == 0) {
+				fb->state = HX_STATE_DATA;
+				fb->offs = 0;
+			} else if (c == HX_FBO) {
+				fb->state = HX_STATE_FSTART;
+			} else {
+				fb->state = HX_STATE_IDLE;
+			};
+			break;
+
+		case HX_STATE_DATA:
+			if (c == HX_CEO) {
+				// Next byte will be escaped:
+				fb->state = HX_STATE_ESC;
+			} else if (c == HX_FBO) {
+				// Complete Frame
+				f->len = fb->offs;
+				fb->state = HX_STATE_IDLE;
+				return true;
+			} else {
+				uint8_t off = fb->offs;
+				if (off < 128) {
+					// Ordinary byte onto the frame:
+					f->data[off] = c;
+					fb->offs = off + 1;
+				} else {
+					fb->state = HX_STATE_IDLE;
+				}
+			}
+			break;
+
+		case HX_STATE_ESC:
+			if (c == HX_FBO) {
+				fb->state = HX_STATE_IDLE;
+			} else {
+				uint8_t off = fb->offs;
+				if (off < 128) {
+					// Escaped byte onto the frame:
+					f->data[off] = HX_ESC(c);
+					fb->offs = off + 1;
+					fb->state = HX_STATE_DATA;
+				} else {
+					fb->state = HX_STATE_IDLE;
+				}
+			}
+			break;
+
+		default:
+			fb->state = HX_STATE_IDLE;
+	}
+	return false;
+}
+
+// Return value: true when nothing has been transmitted
+bool hxstream_tx_handler() {
+	struct frame *f;
+	bool complete = true;
+
+	if (tx_term_state == TERM_STATE_TXING) {
+		f = &tx_term;
+		complete = frame_tx(f, &tx_fbuilder);
+		if (complete) {
+			tx_term_state = TERM_STATE_IDLE;
+			init_frame_builder(&tx_fbuilder);
+		}
+		return false;
+	} else if (BUF_NOT_EMPTY(tx)) {
+		f = BUF_AT_REMOVE(tx);
+		if (f->len <= 128) {
+			complete = frame_tx(f, &tx_fbuilder);
+		} else {
+			return true;
+		}
+		if (complete) {
+			BUF_REMOVE(tx);
+			init_frame_builder(&tx_fbuilder);
+			if (tx_term_state == TERM_STATE_READY) {
+				tx_term_state = TERM_STATE_TXING;
+				tx_fbuilder.id = 1;
+			}
+		}
+		return false;
+	}
+	return true;
+}
+
+static bool frame_tx (struct frame *f, struct frame_builder *fb) {
+	uint8_t o,d;
+	switch (fb->state) {
+		case HX_STATE_IDLE:
+			TX_PUT(HX_FBO);
+			fb->state = HX_STATE_FSTART;
+			break;
+		case HX_STATE_FSTART:
+			TX_PUT(fb->id);
+			fb->state = HX_STATE_DATA;
+			break;
+		case HX_STATE_DATA:
+			if (fb->offs >= f->len) {
+				TX_PUT(HX_FBO);
+				return true;
+			}
+			o = fb->offs;
+			fb->offs = o + 1;
+			d = f->data[o];
+			if (d == HX_FBO || d == HX_CEO) {
+				TX_PUT(HX_CEO);
+				fb->state = HX_STATE_ESC;
+			} else {
+				TX_PUT(d);
+			}
+			break;
+		case HX_STATE_ESC:
+			o = fb->offs;
+			d = f->data[o-1];
+			TX_PUT(HX_ESC(d));
+			fb->state = HX_STATE_DATA;
+			break;
+	}
+	return false;
+}
+
+void hxstream_write_frame  (__xdata uint8_t* __data buf, __pdata uint8_t count) {
+	// write frame to the hxstream transmit buffer
+	if (BUF_NOT_FULL(tx) && count <= 128) {
+		memcpy((BUF_AT_INSERT(tx))->data, buf, count);
+		(BUF_AT_INSERT(tx))->len = count;
+		BUF_INSERT(tx);
+	}
+}
+
+bool hxstream_read_frame (__xdata uint8_t * __data buf, __pdata uint8_t count) {
+	// read a frame from the hxstream recieve buffer.
+	if (BUF_NOT_EMPTY(rx)) {
+		uint8_t avail = (BUF_AT_REMOVE(rx))->len;
+		// XXX is this right??
+		if (avail != count) return false;
+		memcpy(buf, (BUF_AT_REMOVE(rx))->data, count);
+		return true;
+	}
+	return false;
+}
+
+uint8_t hxstream_read_available (void) {
+	if (BUF_NOT_EMPTY(rx)) {
+		return (BUF_AT_REMOVE(rx))->len;
+	}
+	return 0;
+}
+
+void hxstream_term_begin_frame (void) {
+	if (tx_term_state == TERM_STATE_IDLE) {
+		tx_term.len = 0;
+		tx_term_state = TERM_STATE_WRITE;
+	}
+}
+
+void hxstream_term_end_frame (void) {
+	if (tx_term_state == TERM_STATE_WRITE) {
+		if (tx_term.len > 0) {
+			tx_term_state = TERM_STATE_READY;
+		} else {
+			tx_term_state = TERM_STATE_IDLE;
+		}
+	}
+}
+
+void hxstream_term_putchar(char c) {
+	if (tx_term_state == TERM_STATE_WRITE) {
+		if (tx_term.len < 128) {
+			tx_term.data[tx_term.len] = c;
+			tx_term.len++;
+		}
+	}
+}

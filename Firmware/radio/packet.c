@@ -36,6 +36,7 @@
 #include "radio.h"
 #include "packet.h"
 #include "timer.h"
+#include "hxstream.h"
 
 static __bit last_sent_is_resend;
 static __bit last_recv_is_resend;
@@ -63,16 +64,12 @@ static __pdata uint8_t mav_max_xmit;
 
 #define PACKET_RESEND_THRESHOLD 32
 
-#define MAVLINK09_STX 85 // 'U'
-#define MAVLINK10_STX 254
-
 // return the next packet to be sent
 uint8_t
 packet_get_next(register uint8_t max_xmit, __xdata uint8_t * __pdata buf)
 {
 	register uint16_t slen;
-
-	slen = serial_read_available();
+	slen = hxstream_read_available();
 	if (force_resend ||
 	    (feature_opportunistic_resend &&
 	     last_sent_is_resend == false && 
@@ -102,8 +99,8 @@ packet_get_next(register uint8_t max_xmit, __xdata uint8_t * __pdata buf)
 		return 0;
 	}
 
-	// simple framing
-	if (slen > 0 && serial_read_buf(buf, slen)) {
+	// hxstream framing
+	if (slen > 0 && hxstream_read_frame(buf, slen)) {
 		memcpy(last_sent, buf, slen);
 		last_sent_len = slen;
 	} else {
