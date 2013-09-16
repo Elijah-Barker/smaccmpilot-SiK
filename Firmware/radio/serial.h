@@ -53,4 +53,13 @@ extern void	serial_init(register uint8_t speed);
 ///
 extern bool serial_device_valid_speed(register uint8_t speed);
 
+
+/// restart serial isr
+///
+extern void	serial_restart(void);
+
+/// is serial isr active?
+///
+extern volatile bool tx_idle;
+
 #endif // _SERIAL_H_

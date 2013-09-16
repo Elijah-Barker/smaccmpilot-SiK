@@ -39,10 +39,9 @@
 
 
 // flag indicating the transmitter is idle
-static volatile bool			tx_idle;
+volatile bool			tx_idle;
 
 static void			_serial_write(register uint8_t c);
-static void			serial_restart(void);
 static void serial_device_set_speed(register uint8_t speed);
 
 // save and restore serial interrupt. We use this rather than
@@ -130,7 +129,7 @@ serial_init(register uint8_t speed)
 }
 
 
-static void
+void
 serial_restart(void)
 {
 #ifdef SERIAL_RTS

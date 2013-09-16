@@ -29,6 +29,7 @@
 
 #include <string.h>
 #include "board.h"
+#include "serial.h"
 #include "hxstream.h"
 
 #define HX_FBO 0x7e // '~'
@@ -79,6 +80,12 @@ struct frame_builder {
     uint8_t offs;
 };
 
+#define INIT_FRAME_BUILDER(_fb) do { \
+	(_fb)->state = HX_STATE_IDLE; \
+	(_fb)->id = 0; \
+	(_fb)->offs = 0; \
+	} while (0)
+
 #define TX_PUT(c) do { SBUF0 = c; } while (0)
 
 //----------------------------------------------------------------------------
@@ -100,40 +107,37 @@ __pdata static volatile uint16_t    tx_insert, tx_remove;
 __xdata static struct frame         tx_term;
 __pdata static uint8_t              tx_term_state;
 
-static void init_frame_builder(struct frame_builder *fb);
 static bool frame_rx (uint8_t c, struct frame* f, struct frame_builder* fb);
 static bool frame_tx (struct frame *f, struct frame_builder *fb);
 
 void hxstream_init (void) {
-	init_frame_builder(&rx_fbuilder);
+	INIT_FRAME_BUILDER(&rx_fbuilder);
 	rx_insert = 0;
 	rx_remove = 0;
 
-	init_frame_builder(&tx_fbuilder);
+	INIT_FRAME_BUILDER(&tx_fbuilder);
 	tx_insert = 0;
 	tx_remove = 0;
 
 	tx_term_state = TERM_STATE_IDLE;
 }
 
-static void init_frame_builder(struct frame_builder *fb) {
-	fb->state = HX_STATE_IDLE;
-	fb->id = 0;
-	fb->offs = 0;
-}
 
+#pragma save
+#pragma nooverlay
 bool hxstream_rx_handler(uint8_t c) {
 	struct frame *rx_frame;
 	if (BUF_NOT_FULL(rx)) {
 	rx_frame = BUF_AT_INSERT(rx);
 		if (frame_rx(c, rx_frame, &rx_fbuilder)) {
 			BUF_INSERT(rx);
-			init_frame_builder(&rx_fbuilder);
+			INIT_FRAME_BUILDER(&rx_fbuilder);
 		}
 		return true;
 	}
 	return false;
 }
+#pragma restore
 
 static bool frame_rx (uint8_t c, struct frame* f, struct frame_builder* fb) {
 	switch (fb->state) {
@@ -201,33 +205,37 @@ static bool frame_rx (uint8_t c, struct frame* f, struct frame_builder* fb) {
 bool hxstream_tx_handler() {
 	struct frame *f;
 	bool complete = true;
+	bool transmitted = false;
 
 	if (tx_term_state == TERM_STATE_TXING) {
 		f = &tx_term;
 		complete = frame_tx(f, &tx_fbuilder);
+		transmitted = true;
 		if (complete) {
 			tx_term_state = TERM_STATE_IDLE;
-			init_frame_builder(&tx_fbuilder);
+			INIT_FRAME_BUILDER(&tx_fbuilder);
 		}
-		return false;
 	} else if (BUF_NOT_EMPTY(tx)) {
 		f = BUF_AT_REMOVE(tx);
 		if (f->len <= 128) {
 			complete = frame_tx(f, &tx_fbuilder);
+			transmitted = true;
 		} else {
-			return true;
+			complete = true;
 		}
 		if (complete) {
 			BUF_REMOVE(tx);
-			init_frame_builder(&tx_fbuilder);
-			if (tx_term_state == TERM_STATE_READY) {
-				tx_term_state = TERM_STATE_TXING;
-				tx_fbuilder.id = 1;
-			}
+			INIT_FRAME_BUILDER(&tx_fbuilder);
 		}
-		return false;
 	}
-	return true;
+	if ((transmitted == false) && tx_term_state == TERM_STATE_READY) {
+		tx_term_state = TERM_STATE_TXING;
+		tx_fbuilder.id = 1;
+		f = &tx_term;
+		complete = frame_tx(f, &tx_fbuilder);
+		transmitted = true;
+	}
+	return transmitted;
 }
 
 static bool frame_tx (struct frame *f, struct frame_builder *fb) {
@@ -282,6 +290,7 @@ bool hxstream_read_frame (__xdata uint8_t * __data buf, __pdata uint8_t count) {
 		// XXX is this right??
 		if (avail != count) return false;
 		memcpy(buf, (BUF_AT_REMOVE(rx))->data, count);
+		BUF_REMOVE(rx);
 		return true;
 	}
 	return false;
@@ -295,16 +304,17 @@ uint8_t hxstream_read_available (void) {
 }
 
 void hxstream_term_begin_frame (void) {
-	if (tx_term_state == TERM_STATE_IDLE) {
-		tx_term.len = 0;
-		tx_term_state = TERM_STATE_WRITE;
-	}
+	tx_term.len = 0;
+	tx_term_state = TERM_STATE_WRITE;
 }
 
 void hxstream_term_end_frame (void) {
 	if (tx_term_state == TERM_STATE_WRITE) {
 		if (tx_term.len > 0) {
 			tx_term_state = TERM_STATE_READY;
+			if (tx_idle) {
+				serial_restart();
+			}
 		} else {
 			tx_term_state = TERM_STATE_IDLE;
 		}
@@ -319,3 +329,13 @@ void hxstream_term_putchar(char c) {
 		}
 	}
 }
+
+
+#pragma save
+#pragma nooverlay
+void hxstream_check_rts(void) {
+	if ((BUF_NOT_EMPTY(tx) || tx_term_state == TERM_STATE_READY) && tx_idle) {
+		serial_restart();
+	}
+}
+#pragma restore

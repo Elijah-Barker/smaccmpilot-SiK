@@ -44,4 +44,6 @@ void hxstream_term_begin_frame (void);
 void hxstream_term_end_frame (void);
 void hxstream_term_putchar(char c);
 
+void hxstream_check_rts(void);
+
 #endif // __HXSTREAM_H__

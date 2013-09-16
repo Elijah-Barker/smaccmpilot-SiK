@@ -29,6 +29,7 @@
 
 #include "radio.h"
 #include "timer.h"
+#include "hxstream.h"
 
 /// Counter used by delay_msec
 ///
@@ -45,6 +46,9 @@ INTERRUPT(T3_ISR, INTERRUPT_TIMER3)
 
 	// call the AT parser tick
 	at_timer();
+
+	// check if hxstream is ready to send
+	hxstream_check_rts();
 
 	// update the delay counter
 	if (delay_counter > 0)
@@ -90,6 +94,7 @@ INTERRUPT(T2_ISR, INTERRUPT_TIMER2)
 
 	// increment the high 16 bits
 	timer2_high++;
+
 }
 
 // return the 16 bit timer2 counter
