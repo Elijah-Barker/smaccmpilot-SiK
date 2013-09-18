@@ -106,6 +106,7 @@ __pdata static volatile uint16_t    tx_insert, tx_remove;
 
 __xdata static struct frame         tx_term;
 __pdata static uint8_t              tx_term_state;
+__xdata static struct frame         rx_term;
 
 static bool frame_rx (uint8_t c, struct frame* f, struct frame_builder* fb);
 static bool frame_tx (struct frame *f, struct frame_builder *fb);
@@ -122,18 +123,40 @@ void hxstream_init (void) {
 	tx_term_state = TERM_STATE_IDLE;
 }
 
-
+// Return value: true if the byte was dropped from processing due to
+//  full buffers.
 #pragma save
 #pragma nooverlay
 bool hxstream_rx_handler(uint8_t c) {
 	struct frame *rx_frame;
-	if (BUF_NOT_FULL(rx)) {
-	rx_frame = BUF_AT_INSERT(rx);
-		if (frame_rx(c, rx_frame, &rx_fbuilder)) {
-			BUF_INSERT(rx);
-			INIT_FRAME_BUILDER(&rx_fbuilder);
+	uint8_t i;
+	if (rx_fbuilder.state < HX_STATE_DATA) {
+		// Frame not written to until we're in data mode. Until then
+		// we use frame_rx to detect a frame's start and id byte
+		frame_rx(c, NULL, &rx_fbuilder);
+	} else {
+		// id 0 is for frames to be sent through the radio
+		if (rx_fbuilder.id == 0) {
+			if (BUF_NOT_FULL(rx)) {
+				rx_frame = BUF_AT_INSERT(rx);
+				if (frame_rx(c, rx_frame, &rx_fbuilder)) {
+					BUF_INSERT(rx);
+					INIT_FRAME_BUILDER(&rx_fbuilder);
+				}
+			} else {
+				return true;
+			}
 		}
-		return true;
+		// id 1 is for control frames
+		if (rx_fbuilder.id == 1) {
+			rx_frame = &rx_term;
+			if (frame_rx(c, rx_frame, &rx_fbuilder)) {
+				for (i = 0; i < rx_term.len; i++) {
+					at_input_aux(rx_term.data[i]);
+				}
+				INIT_FRAME_BUILDER(&rx_fbuilder);
+			}
+		}
 	}
 	return false;
 }
@@ -148,9 +171,10 @@ static bool frame_rx (uint8_t c, struct frame* f, struct frame_builder* fb) {
 			break;
 
 		case HX_STATE_FSTART:
-			if (c == 0) {
+			if (c == 0 || c == 1) {
 				fb->state = HX_STATE_DATA;
 				fb->offs = 0;
+				fb->id   = c;
 			} else if (c == HX_FBO) {
 				fb->state = HX_STATE_FSTART;
 			} else {

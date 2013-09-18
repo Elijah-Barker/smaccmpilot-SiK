@@ -59,7 +59,10 @@ extern void	at_plus_detector(register uint8_t c);
 ///
 ///  @param	c		Received character.
 ///
+/// use at_input from inside an interrupt, at_input_aux otherwise
 extern void	at_input(register uint8_t c);
+
+extern void at_input_aux(register uint8_t c);
 
 /// Check for and execute AT commands
 ///

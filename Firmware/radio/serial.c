@@ -77,7 +77,6 @@ serial_interrupt(void) __interrupt(INTERRUPT_UART0)
 
 			// and queue it for general reception
 			if (hxstream_rx_handler(c)) {
-			} else {
 				if (errors.serial_rx_overflow != 0xFFFF) {
 					errors.serial_rx_overflow++;
 				}

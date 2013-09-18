@@ -65,25 +65,19 @@ static void	at_plus(void);
 void
 at_input(register uint8_t c)
 {
+    at_input_aux(c);
+}
+#pragma restore
+
+void
+at_input_aux(register uint8_t c)
+{
 	// AT mode is active and waiting for a command
 	switch (c) {
 		// CR - submits command for processing
 	case '\r':
-		putchar('\n');
 		at_cmd[at_cmd_len] = 0;
 		at_cmd_ready = true;
-		break;
-
-		// backspace - delete a character
-		// delete - delete a character
-	case '\b':
-	case '\x7f':
-		if (at_cmd_len > 0) {
-			putchar('\b');
-			putchar(' ');
-			putchar('\b');
-			at_cmd_len--;
-		}
 		break;
 
 		// character - add to buffer if valid
@@ -92,7 +86,6 @@ at_input(register uint8_t c)
 			if (isprint(c)) {
 				c = toupper(c);
 				at_cmd[at_cmd_len++] = c;
-				putchar(c);
 			}
 			break;
 		}
@@ -107,7 +100,6 @@ at_input(register uint8_t c)
 		break;
 	}
 }
-#pragma restore
 
 // +++ detector state machine
 //
@@ -210,14 +202,6 @@ at_command(void)
 {
 	// require a command with the AT prefix
 	if (at_cmd_ready) {
-		if ((at_cmd_len >= 2) && (at_cmd[0] == 'R') && (at_cmd[1] == 'T')) {
-			// remote AT command - send it to the tdm
-			// system to send to the remote radio
-			at_cmd_len = 0;
-			at_cmd_ready = false;
-			return;
-		}
-		
 		if ((at_cmd_len >= 2) && (at_cmd[0] == 'A') && (at_cmd[1] == 'T')) {
 			hxstream_term_begin_frame();
 			// look at the next byte to determine what to do
@@ -253,11 +237,11 @@ at_command(void)
 			}
 		}
 
-		// unlock the command buffer
-		at_cmd_len = 0;
-		at_cmd_ready = false;
 		hxstream_term_end_frame();
 	}
+	// unlock the command buffer
+	at_cmd_len = 0;
+	at_cmd_ready = false;
 }
 
 static void
