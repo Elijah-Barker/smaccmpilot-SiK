@@ -238,10 +238,11 @@ at_command(void)
 		}
 
 		hxstream_term_end_frame();
+
+		// unlock the command buffer
+		at_cmd_len = 0;
+		at_cmd_ready = false;
 	}
-	// unlock the command buffer
-	at_cmd_len = 0;
-	at_cmd_ready = false;
 }
 
 static void

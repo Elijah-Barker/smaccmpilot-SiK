@@ -309,10 +309,7 @@ void hxstream_write_frame  (__xdata uint8_t* __data buf, __pdata uint8_t count) 
 
 bool hxstream_read_frame (__xdata uint8_t * __data buf, __pdata uint8_t count) {
 	// read a frame from the hxstream recieve buffer.
-	if (BUF_NOT_EMPTY(rx)) {
-		uint8_t avail = (BUF_AT_REMOVE(rx))->len;
-		// XXX is this right??
-		if (avail != count) return false;
+	if (hxstream_read_available() == count) {
 		memcpy(buf, (BUF_AT_REMOVE(rx))->data, count);
 		BUF_REMOVE(rx);
 		return true;
