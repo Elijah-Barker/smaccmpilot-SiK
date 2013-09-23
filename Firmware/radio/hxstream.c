@@ -32,6 +32,10 @@
 #include "serial.h"
 #include "hxstream.h"
 
+// Permits a 96 byte data frame with four extra bytes available
+// for future tag expansion.
+#define HX_FRAMELEN  100
+
 #define HX_FBO 0x7e // '~'
 #define HX_CEO 0x7c // '|'
 #define HX_ESC(_x) (_x^0x20)
@@ -71,7 +75,7 @@
 
 struct frame {
 	uint8_t len;
-	uint8_t data[128];
+	uint8_t data[HX_FRAMELEN];
 };
 
 struct frame_builder {
@@ -193,7 +197,7 @@ static bool frame_rx (uint8_t c, struct frame* f, struct frame_builder* fb) {
 				return true;
 			} else {
 				uint8_t off = fb->offs;
-				if (off < 128) {
+				if (off < HX_FRAMELEN) {
 					// Ordinary byte onto the frame:
 					f->data[off] = c;
 					fb->offs = off + 1;
@@ -208,7 +212,7 @@ static bool frame_rx (uint8_t c, struct frame* f, struct frame_builder* fb) {
 				fb->state = HX_STATE_IDLE;
 			} else {
 				uint8_t off = fb->offs;
-				if (off < 128) {
+				if (off < HX_FRAMELEN) {
 					// Escaped byte onto the frame:
 					f->data[off] = HX_ESC(c);
 					fb->offs = off + 1;
@@ -241,7 +245,7 @@ bool hxstream_tx_handler() {
 		}
 	} else if (BUF_NOT_EMPTY(tx)) {
 		f = BUF_AT_REMOVE(tx);
-		if (f->len <= 128) {
+		if (f->len <= HX_FRAMELEN) {
 			complete = frame_tx(f, &tx_fbuilder);
 			transmitted = true;
 		} else {
@@ -300,7 +304,7 @@ static bool frame_tx (struct frame *f, struct frame_builder *fb) {
 
 void hxstream_write_frame  (__xdata uint8_t* __data buf, __pdata uint8_t count) {
 	// write frame to the hxstream transmit buffer
-	if (BUF_NOT_FULL(tx) && count <= 128) {
+	if (BUF_NOT_FULL(tx) && count <= HX_FRAMELEN) {
 		memcpy((BUF_AT_INSERT(tx))->data, buf, count);
 		(BUF_AT_INSERT(tx))->len = count;
 		BUF_INSERT(tx);
@@ -344,7 +348,7 @@ void hxstream_term_end_frame (void) {
 
 void hxstream_term_putchar(char c) {
 	if (tx_term_state == TERM_STATE_WRITE) {
-		if (tx_term.len < 128) {
+		if (tx_term.len < HX_FRAMELEN) {
 			tx_term.data[tx_term.len] = c;
 			tx_term.len++;
 		}

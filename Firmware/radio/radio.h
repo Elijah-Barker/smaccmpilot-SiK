@@ -52,8 +52,7 @@
 
 // the biggest packet length we will allow. To allow for golay
 // encoding this needs to be a multiple of 6
-// This is the smallest packet that will fit our 128 byte frame.
-#define MAX_PACKET_LENGTH 132
+#define MAX_PACKET_LENGTH 252
 
 
 #include "board.h"
