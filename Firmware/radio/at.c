@@ -48,6 +48,7 @@ __pdata uint8_t	at_cmd_len;
 // mode flags
 bool		at_mode_active;	///< if true, incoming bytes are for AT command
 bool		at_cmd_ready;	///< if true, at_cmd / at_cmd_len contain valid data
+bool		at_resp_noframing = false;	///< if true, don't use hx framing for output
 
 // test bits
 __pdata uint8_t		at_testmode;    ///< test modes enabled (AT_TEST_*)
@@ -96,6 +97,7 @@ at_input_aux(register uint8_t c)
 		// of an accidental escape sequence.
 
 		at_mode_active = 0;
+		at_resp_noframing = 0;
 		at_cmd_len = 0;
 		break;
 	}
@@ -187,6 +189,7 @@ at_timer(void)
 				at_cmd[1] = 'T';
 				at_cmd[2] = '\0';
 				at_cmd_len = 2;
+				at_resp_noframing = true;
 				at_cmd_ready = true;
 				break;
 			default:
@@ -221,6 +224,7 @@ at_command(void)
 			case 'O':		// O -> go online (exit command mode)
 				at_plus_counter = ATP_COUNT_1S;
 				at_mode_active = 0;
+				at_resp_noframing = 0;
 				break;
 			case 'S':
 				at_s();

@@ -40,10 +40,11 @@
 #define HX_CEO 0x7c // '|'
 #define HX_ESC(_x) (_x^0x20)
 
-#define HX_STATE_IDLE    0
-#define HX_STATE_FSTART  1
-#define HX_STATE_DATA    2
-#define HX_STATE_ESC     3
+#define HX_STATE_IDLE      0
+#define HX_STATE_FSTART    1
+#define HX_STATE_DATA      2
+#define HX_STATE_ESC       3
+#define HX_STATE_NOFRAMING 4
 
 #define TERM_STATE_IDLE  0
 #define TERM_STATE_WRITE 1
@@ -260,6 +261,9 @@ bool hxstream_tx_handler() {
 		tx_term_state = TERM_STATE_TXING;
 		tx_fbuilder.id = 1;
 		f = &tx_term;
+		if (at_resp_noframing) {
+			tx_fbuilder.state = HX_STATE_NOFRAMING;
+		}
 		complete = frame_tx(f, &tx_fbuilder);
 		transmitted = true;
 	}
@@ -298,6 +302,15 @@ static bool frame_tx (struct frame *f, struct frame_builder *fb) {
 			TX_PUT(HX_ESC(d));
 			fb->state = HX_STATE_DATA;
 			break;
+		case HX_STATE_NOFRAMING:
+			if (fb->offs >= f->len) {
+				TX_PUT(0);
+				return true;
+			}
+			o = fb->offs;
+			fb->offs = o + 1;
+			d = f->data[o];
+			TX_PUT(d);
 	}
 	return false;
 }

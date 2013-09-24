@@ -84,4 +84,6 @@ extern __pdata uint8_t  at_testmode;    ///< AT_TEST_* bits
 extern __pdata char at_cmd[AT_CMD_MAXLEN + 1];
 extern __pdata uint8_t at_cmd_len;
 
+extern bool at_resp_noframing;
+
 #endif	// _AT_H_
