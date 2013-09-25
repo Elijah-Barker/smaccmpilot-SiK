@@ -60,6 +60,8 @@ static void	at_i(void);
 static void	at_s(void);
 static void	at_ampersand(void);
 static void	at_plus(void);
+static void	at_bin_1(void);
+static void	at_bin_2(void);
 
 #pragma save
 #pragma nooverlay
@@ -207,26 +209,33 @@ at_command(void)
 	if (at_cmd_ready) {
 		if ((at_cmd_len >= 2) && (at_cmd[0] == 'A') && (at_cmd[1] == 'T')) {
 			hxstream_term_begin_frame();
+			printf("AT");
 			// look at the next byte to determine what to do
 			switch (at_cmd[2]) {
 			case '\0':		// no command -> OK
+				putchar('\n');
 				at_ok();
 				break;
 			case '&':
+				putchar('&');
 				at_ampersand();
 				break;
 			case '+':
+				putchar('+');
 				at_plus();
 				break;
 			case 'I':
+				putchar('I');
 				at_i();
 				break;
 			case 'O':		// O -> go online (exit command mode)
+				printf("O\n");
 				at_plus_counter = ATP_COUNT_1S;
 				at_mode_active = 0;
 				at_resp_noframing = 0;
 				break;
 			case 'S':
+				putchar('S');
 				at_s();
 				break;
 
@@ -238,6 +247,16 @@ at_command(void)
 
 			default:
 				at_error();
+			}
+		} else if ((at_cmd_len == 2) && (at_cmd[0] == 'B')) {
+			hxstream_term_begin_frame();
+			switch (at_cmd[1]) {
+			case '1':
+				at_bin_1();
+                break;
+			case '2':
+				at_bin_2();
+                break;
 			}
 		}
 
@@ -272,6 +291,7 @@ at_parse_number() __reentrant
 	reg = 0;
 	for (;;) {
 		c = at_cmd[idx];
+		putchar(c);
 		if (!isdigit(c))
 			break;
 		reg = (reg * 10) + (c - '0');
@@ -283,6 +303,8 @@ at_parse_number() __reentrant
 static void
 at_i(void)
 {
+	putchar(at_cmd[3]);
+	putchar('\n');
 	switch (at_cmd[3]) {
 	case '\0':
 	case '0':
@@ -337,10 +359,12 @@ at_s(void)
 		at_error();
 		return;
 	}
+	putchar(at_cmd[idx]);
 
 	switch (at_cmd[idx]) {
 	case '?':
 		val = param_get(sreg);
+		putchar('\n');
 		printf("%lu\n", val);
 		return;
 
@@ -349,6 +373,7 @@ at_s(void)
 			idx++;
 			val = at_parse_number();
 			if (param_set(sreg, val)) {
+				putchar('\n');
 				at_ok();
 				return;
 			}
@@ -361,6 +386,8 @@ at_s(void)
 static void
 at_ampersand(void)
 {
+	putchar(at_cmd[3]);
+	putchar('\n');
 	switch (at_cmd[3]) {
 	case 'F':
 		param_default();
@@ -414,10 +441,11 @@ at_plus(void)
 	__pdata uint8_t		creg;
 	__pdata uint32_t	val;
 
+	putchar(at_cmd[3]);
+	putchar('\n');
 	// get the register number first
 	idx = 4;
 	creg = at_parse_number();
-
 	switch (at_cmd[3])
 	{
 	case 'P': // AT+P=x set power level pwm to x immediately
@@ -461,4 +489,18 @@ at_plus(void)
 	}
 #endif //BOARD_rfd900a
 	at_error();
+
 }
+
+static void
+at_bin_1(void)
+{
+    printf("B1\n");
+}
+
+static void
+at_bin_2(void)
+{
+    printf("B2\n");
+}
+
