@@ -60,8 +60,7 @@ static void	at_i(void);
 static void	at_s(void);
 static void	at_ampersand(void);
 static void	at_plus(void);
-static void	at_bin_1(void);
-static void	at_bin_2(void);
+static void	at_bin_stat(void);
 
 #pragma save
 #pragma nooverlay
@@ -248,16 +247,9 @@ at_command(void)
 			default:
 				at_error();
 			}
-		} else if ((at_cmd_len == 2) && (at_cmd[0] == 'B')) {
+		} else if ((at_cmd_len == 1) && (at_cmd[0] == 'B')) {
 			hxstream_term_begin_frame();
-			switch (at_cmd[1]) {
-			case '1':
-				at_bin_1();
-                break;
-			case '2':
-				at_bin_2();
-                break;
-			}
+			at_bin_stat();
 		}
 
 		hxstream_term_end_frame();
@@ -492,15 +484,26 @@ at_plus(void)
 
 }
 
-static void
-at_bin_1(void)
-{
-    printf("B1\n");
-}
+#define put16(_v) do  { \
+	putchar( (uint8_t) (((_v) >> 8) & 0xFF) ); \
+	putchar( (uint8_t) (((_v) >> 0) & 0xFF) ); \
+	} while (0);
 
 static void
-at_bin_2(void)
+at_bin_stat(void)
 {
-    printf("B2\n");
+	putchar('B');                             // 0
+	putchar(statistics.average_rssi);         // 1
+	putchar(statistics.average_noise);        // 2
+	put16  (statistics.receive_count);        // 3, 4
+	putchar(remote_statistics.average_rssi);  // 5
+	putchar(remote_statistics.average_noise); // 6
+	put16  (remote_statistics.receive_count); // 7, 8
+	put16  (errors.tx_errors);                // 9, 10
+	put16  (errors.rx_errors);                // 11, 12
+	put16  (errors.serial_tx_overflow);       // 13, 14
+	put16  (errors.serial_rx_overflow);       // 15, 16
+	put16  (errors.corrected_errors);         // 17, 18
+	put16  (errors.corrected_packets);        // 19, 20
 }
 
