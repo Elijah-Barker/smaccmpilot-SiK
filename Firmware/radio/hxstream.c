@@ -146,7 +146,6 @@ bool hxstream_rx_handler(uint8_t c) {
 				rx_frame = BUF_AT_INSERT(rx);
 				if (frame_rx(c, rx_frame, &rx_fbuilder)) {
 					BUF_INSERT(rx);
-					INIT_FRAME_BUILDER(&rx_fbuilder);
 				}
 			} else {
 				return true;
@@ -159,7 +158,6 @@ bool hxstream_rx_handler(uint8_t c) {
 				for (i = 0; i < rx_term.len; i++) {
 					at_input_aux(rx_term.data[i]);
 				}
-				INIT_FRAME_BUILDER(&rx_fbuilder);
 			}
 		}
 	}
@@ -181,8 +179,11 @@ static bool frame_rx (uint8_t c, struct frame* f, struct frame_builder* fb) {
 				fb->offs = 0;
 				fb->id   = c;
 			} else if (c == HX_FBO) {
+				// Getting multiple FBOs in a row
+				// keeps us at this state.
 				fb->state = HX_STATE_FSTART;
 			} else {
+				// Error, we don't handle that frame type
 				fb->state = HX_STATE_IDLE;
 			};
 			break;
@@ -194,7 +195,8 @@ static bool frame_rx (uint8_t c, struct frame* f, struct frame_builder* fb) {
 			} else if (c == HX_FBO) {
 				// Complete Frame
 				f->len = fb->offs;
-				fb->state = HX_STATE_IDLE;
+				// Next byte will be start of next frame:
+				fb->state = HX_STATE_FSTART;
 				return true;
 			} else {
 				uint8_t off = fb->offs;
@@ -203,6 +205,8 @@ static bool frame_rx (uint8_t c, struct frame* f, struct frame_builder* fb) {
 					f->data[off] = c;
 					fb->offs = off + 1;
 				} else {
+					// Error, no more room to store data.
+					// Wait at idle for an FBO before continuing.
 					fb->state = HX_STATE_IDLE;
 				}
 			}
@@ -210,7 +214,9 @@ static bool frame_rx (uint8_t c, struct frame* f, struct frame_builder* fb) {
 
 		case HX_STATE_ESC:
 			if (c == HX_FBO) {
-				fb->state = HX_STATE_IDLE;
+				// Unexpected frame ending
+				f->len = 0;
+				fb->state = HX_STATE_FSTART;
 			} else {
 				uint8_t off = fb->offs;
 				if (off < HX_FRAMELEN) {
@@ -219,6 +225,8 @@ static bool frame_rx (uint8_t c, struct frame* f, struct frame_builder* fb) {
 					fb->offs = off + 1;
 					fb->state = HX_STATE_DATA;
 				} else {
+					// Error, no more room to store data.
+					// Wait at idle for an FBO before continuing.
 					fb->state = HX_STATE_IDLE;
 				}
 			}
@@ -377,3 +385,4 @@ void hxstream_check_rts(void) {
 	}
 }
 #pragma restore
+
