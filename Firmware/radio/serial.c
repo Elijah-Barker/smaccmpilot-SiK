@@ -91,6 +91,7 @@ serial_interrupt(void) __interrupt(INTERRUPT_UART0)
 
 		// look for another byte we can send
 		if (hxstream_tx_handler()) {
+			// tx_handler returns true when no byte has been transmitted.
 			// note that the transmitter requires a kick to restart it
 			tx_idle = true;
 		}

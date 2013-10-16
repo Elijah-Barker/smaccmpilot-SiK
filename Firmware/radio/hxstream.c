@@ -267,7 +267,7 @@ bool hxstream_tx_handler() {
 		complete = frame_tx(f, &tx_fbuilder);
 		transmitted = true;
 	}
-	return transmitted;
+	return (transmitted)?false:true;
 }
 
 static bool frame_tx (struct frame *f, struct frame_builder *fb) {
