@@ -148,6 +148,7 @@ bool hxstream_rx_handler(uint8_t c) {
 					BUF_INSERT(rx);
 				}
 			} else {
+				rx_fbuilder.state = HX_STATE_IDLE;
 				return true;
 			}
 		}
