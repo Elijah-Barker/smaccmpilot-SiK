@@ -599,10 +599,16 @@ tdm_serial_loop(void)
 		}
 		max_xmit = (tdm_state_remaining - packet_latency) / ticks_per_byte;
 		if (max_xmit < sizeof(trailer)+1) {
+			errors.max_xmit = 1;
 			// can't fit the trailer in with a byte to spare
 			continue;
 		}
 		max_xmit -= sizeof(trailer)+1;
+		// Log for debugging:
+		if (max_xmit > errors.max_xmit) {
+			errors.max_xmit = max_xmit;
+		}
+
 		if (max_xmit > max_data_packet_length) {
 			max_xmit = max_data_packet_length;
 		}
