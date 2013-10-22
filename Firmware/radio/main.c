@@ -41,6 +41,7 @@
 #include "tdm.h"
 #include "timer.h"
 #include "freq_hopping.h"
+#include "hxstream.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @name	Interrupt vector prototypes
@@ -131,11 +132,12 @@ void
 panic(char *fmt, ...)
 {
 	va_list ap;
-
+	hxstream_term_begin_frame();
 	puts("\n**PANIC**");
 	va_start(ap, fmt);
 	vprintf(fmt, ap);
 	puts("");
+	hxstream_term_end_frame();
 
 	EA = 1;
 	ES0 = 1;
