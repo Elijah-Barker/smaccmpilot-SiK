@@ -146,10 +146,13 @@ bool hxstream_rx_handler(uint8_t c) {
 				rx_frame = BUF_AT_INSERT(rx);
 				if (frame_rx(c, rx_frame, &rx_fbuilder)) {
 					BUF_INSERT(rx);
+					errors.serial_rx_ok++;
 				}
 			} else {
 				rx_fbuilder.state = HX_STATE_IDLE;
-				return true;
+				if (errors.serial_rx_overflow != 0xFFFF) {
+					errors.serial_rx_overflow++;
+				}
 			}
 		}
 		// id 1 is for control frames
@@ -330,6 +333,11 @@ void hxstream_write_frame  (__xdata uint8_t* __data buf, __pdata uint8_t count) 
 		memcpy((BUF_AT_INSERT(tx))->data, buf, count);
 		(BUF_AT_INSERT(tx))->len = count;
 		BUF_INSERT(tx);
+		errors.serial_tx_ok++;
+	} else {
+		if (errors.serial_tx_overflow != 0xFFFF) {
+			errors.serial_tx_overflow++;
+		}
 	}
 }
 

@@ -76,11 +76,7 @@ serial_interrupt(void) __interrupt(INTERRUPT_UART0)
 			at_plus_detector(c);
 
 			// and queue it for general reception
-			if (hxstream_rx_handler(c)) {
-				if (errors.serial_rx_overflow != 0xFFFF) {
-					errors.serial_rx_overflow++;
-				}
-			}
+			hxstream_rx_handler(c);
 		}
 	}
 
