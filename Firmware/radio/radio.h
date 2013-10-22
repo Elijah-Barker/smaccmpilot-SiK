@@ -126,9 +126,12 @@ struct error_counts {
 	uint16_t rx_errors;		///< count of packet receive errors
 	uint16_t tx_errors;		///< count of packet transmit errors
 	uint16_t serial_tx_overflow;    ///< count of serial transmit overflows
+	uint16_t serial_tx_ok;          ///< count of serial transmit frames
 	uint16_t serial_rx_overflow;    ///< count of serial receive overflows
+	uint16_t serial_rx_ok;          ///< count of serial receive frames
 	uint16_t corrected_errors;      ///< count of words corrected by golay code
 	uint16_t corrected_packets;     ///< count of packets corrected by golay code
+	uint8_t max_xmit;
 };
 __pdata extern struct error_counts errors;
 

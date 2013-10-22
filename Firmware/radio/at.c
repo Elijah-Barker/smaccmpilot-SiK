@@ -505,5 +505,9 @@ at_bin_stat(void)
 	put16  (errors.serial_rx_overflow);       // 15, 16
 	put16  (errors.corrected_errors);         // 17, 18
 	put16  (errors.corrected_packets);        // 19, 20
+	put16  (errors.serial_tx_ok);             // 21, 22
+	put16  (errors.serial_rx_ok);             // 23, 24
+	putchar(errors.max_xmit);                 // 25
+	errors.max_xmit = 0;
 }
 
