@@ -113,8 +113,11 @@ __xdata static struct frame         tx_term;
 __xdata static uint8_t              tx_term_state;
 __xdata static struct frame         rx_term;
 
-static bool frame_rx (uint8_t c, struct frame* f, struct frame_builder* fb);
-static bool frame_tx (struct frame *f, struct frame_builder *fb);
+static bool frame_rx (uint8_t c,
+		__xdata struct frame* f,
+		__xdata struct frame_builder* fb);
+static bool frame_tx (__xdata struct frame *f,
+		__xdata struct frame_builder *fb);
 
 void hxstream_init (void) {
 	INIT_FRAME_BUILDER(&rx_fbuilder);
@@ -133,8 +136,8 @@ void hxstream_init (void) {
 #pragma save
 #pragma nooverlay
 bool hxstream_rx_handler(uint8_t c) {
-	struct frame *rx_frame;
-	uint8_t i;
+	__xdata struct frame *rx_frame;
+	__xdata uint8_t i;
 	if (rx_fbuilder.state < HX_STATE_DATA) {
 		// Frame not written to until we're in data mode. Until then
 		// we use frame_rx to detect a frame's start and id byte
@@ -169,7 +172,11 @@ bool hxstream_rx_handler(uint8_t c) {
 }
 #pragma restore
 
-static bool frame_rx (uint8_t c, struct frame* f, struct frame_builder* fb) {
+static bool frame_rx (uint8_t c,
+		__xdata struct frame* f,
+		__xdata struct frame_builder* fb)
+{
+	__xdata uint8_t off;
 	switch (fb->state) {
 		case HX_STATE_IDLE:
 			if (c == HX_FBO) {
@@ -203,7 +210,7 @@ static bool frame_rx (uint8_t c, struct frame* f, struct frame_builder* fb) {
 				fb->state = HX_STATE_FSTART;
 				return true;
 			} else {
-				uint8_t off = fb->offs;
+				off = fb->offs;
 				if (off < HX_FRAMELEN) {
 					// Ordinary byte onto the frame:
 					f->data[off] = c;
@@ -222,7 +229,7 @@ static bool frame_rx (uint8_t c, struct frame* f, struct frame_builder* fb) {
 				f->len = 0;
 				fb->state = HX_STATE_FSTART;
 			} else {
-				uint8_t off = fb->offs;
+				off = fb->offs;
 				if (off < HX_FRAMELEN) {
 					// Escaped byte onto the frame:
 					f->data[off] = HX_ESC(c);
@@ -244,10 +251,12 @@ static bool frame_rx (uint8_t c, struct frame* f, struct frame_builder* fb) {
 
 // Return value: true when nothing has been transmitted
 bool hxstream_tx_handler() {
-	struct frame *f;
+	__xdata struct frame *f;
 	bool complete = true;
 	bool transmitted = false;
 
+	complete = true;
+	transmitted = false;
 	if (tx_term_state == TERM_STATE_TXING) {
 		f = &tx_term;
 		complete = frame_tx(f, &tx_fbuilder);
@@ -282,8 +291,10 @@ bool hxstream_tx_handler() {
 	return (transmitted)?false:true;
 }
 
-static bool frame_tx (struct frame *f, struct frame_builder *fb) {
-	uint8_t o,d;
+static bool frame_tx (__xdata struct frame *f,
+		__xdata struct frame_builder *fb)
+{
+	__xdata uint8_t o,d;
 	switch (fb->state) {
 		case HX_STATE_IDLE:
 			TX_PUT(HX_FBO);
@@ -327,7 +338,7 @@ static bool frame_tx (struct frame *f, struct frame_builder *fb) {
 	return false;
 }
 
-void hxstream_write_frame  (__xdata uint8_t* __data buf, __pdata uint8_t count) {
+void hxstream_write_frame (__xdata uint8_t* __data buf, __pdata uint8_t count) {
 	// write frame to the hxstream transmit buffer
 	if (BUF_NOT_FULL(tx) && count <= HX_FRAMELEN) {
 		memcpy((BUF_AT_INSERT(tx))->data, buf, count);
