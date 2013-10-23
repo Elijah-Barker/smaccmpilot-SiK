@@ -42,13 +42,13 @@
 __pdata uint8_t pdata_canary = 0x41;
 
 // AT command buffer
-__pdata char at_cmd[AT_CMD_MAXLEN + 1];
-__pdata uint8_t	at_cmd_len;
+__xdata volatile char at_cmd[AT_CMD_MAXLEN + 1];
+__xdata volatile uint8_t at_cmd_len;
 
 // mode flags
-bool		at_mode_active;	///< if true, incoming bytes are for AT command
-bool		at_cmd_ready;	///< if true, at_cmd / at_cmd_len contain valid data
-bool		at_resp_noframing = false;	///< if true, don't use hx framing for output
+volatile bool at_mode_active; ///< if true, incoming bytes are for AT command
+volatile bool at_cmd_ready; ///< if true, at_cmd / at_cmd_len contain valid data
+volatile bool at_resp_noframing = false; ///< if true, don't use hx framing for output
 
 // test bits
 __pdata uint8_t		at_testmode;    ///< test modes enabled (AT_TEST_*)
@@ -74,6 +74,8 @@ at_input(register uint8_t c)
 void
 at_input_aux(register uint8_t c)
 {
+	// Ignore input if a command is pending.
+	if (at_cmd_ready == true) return;
 	// AT mode is active and waiting for a command
 	switch (c) {
 		// CR - submits command for processing

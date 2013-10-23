@@ -35,8 +35,8 @@
 #ifndef _AT_H_
 #define _AT_H_
 
-extern bool	at_mode_active;	///< if true, the AT interpreter is in command mode
-extern bool	at_cmd_ready;	///< if true, at_cmd / at_cmd_len contain valid data
+extern volatile bool at_mode_active; ///< if true, the AT interpreter is in command mode
+extern volatile bool at_cmd_ready; ///< if true, at_cmd / at_cmd_len contain valid data
 
 /// Timer tick handler for the AT command interpreter
 ///
@@ -81,9 +81,9 @@ extern __pdata uint8_t  at_testmode;    ///< AT_TEST_* bits
 #define AT_CMD_MAXLEN	16
 
 // AT command buffer
-extern __pdata char at_cmd[AT_CMD_MAXLEN + 1];
-extern __pdata uint8_t at_cmd_len;
+extern __xdata volatile char at_cmd[AT_CMD_MAXLEN + 1];
+extern __xdata volatile uint8_t at_cmd_len;
 
-extern bool at_resp_noframing;
+extern volatile bool at_resp_noframing;
 
 #endif	// _AT_H_
