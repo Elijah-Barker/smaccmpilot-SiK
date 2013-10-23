@@ -120,7 +120,7 @@ struct statistics {
 	uint8_t average_noise;
 	uint16_t receive_count;
 };
-__pdata extern struct statistics statistics, remote_statistics;
+__xdata extern struct statistics statistics, remote_statistics;
 
 struct error_counts {
 	uint16_t rx_errors;		///< count of packet receive errors
@@ -133,7 +133,7 @@ struct error_counts {
 	uint16_t corrected_packets;     ///< count of packets corrected by golay code
 	uint8_t max_xmit;
 };
-__pdata extern struct error_counts errors;
+__xdata extern struct error_counts errors;
 
 /// receives a packet from the radio
 ///
