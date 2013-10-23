@@ -93,6 +93,17 @@ bool feature_golay;
 bool feature_opportunistic_resend;
 bool feature_rtscts;
 
+static void init_errors(void) {
+	errors.rx_errors = 0;
+	errors.tx_errors = 0;
+	errors.serial_tx_overflow = 0;
+	errors.serial_tx_ok = 0;
+	errors.serial_rx_overflow = 0;
+	errors.serial_rx_ok = 0;
+	errors.corrected_errors = 0;
+	errors.corrected_packets = 0;
+}
+
 void
 main(void)
 {
@@ -125,8 +136,10 @@ main(void)
 		panic("failed to enable receiver");
 	}
 
+	init_errors();
 	tdm_serial_loop();
 }
+
 
 void
 panic(char *fmt, ...)
