@@ -30,6 +30,7 @@
 #include "radio.h"
 #include "timer.h"
 #include "hxstream.h"
+#include "tdm.h"
 
 /// Counter used by delay_msec
 ///
@@ -95,6 +96,14 @@ INTERRUPT(T2_ISR, INTERRUPT_TIMER2)
 	// increment the high 16 bits
 	timer2_high++;
 
+	if (tdm_loop_running > 0) {
+		if (tdm_watchdog++ > 10) {
+			// generate a software reset
+			RSTSRC |= (1 << 4);
+			for (;;)
+				;
+		}
+	}
 }
 
 // return the 16 bit timer2 counter

@@ -59,4 +59,7 @@ extern __pdata uint8_t duty_cycle;
 /// the LBT threshold
 extern __pdata uint8_t lbt_rssi;
 
+/// tdm loop watchdog
+extern volatile __xdata uint8_t tdm_loop_running;
+extern volatile __xdata uint8_t tdm_watchdog;
 #endif // _TDM_H_

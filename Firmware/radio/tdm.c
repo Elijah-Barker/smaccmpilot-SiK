@@ -143,6 +143,8 @@ __pdata struct tdm_trailer trailer;
 /// buffer to hold a remote AT command before sending
 static bool send_at_command;
 
+volatile __xdata uint8_t tdm_loop_running;
+volatile __xdata uint8_t tdm_watchdog;
 /// display RSSI output
 ///
 void
@@ -433,6 +435,7 @@ tdm_serial_loop(void)
 	__pdata uint16_t last_t = timer2_tick();
 	__pdata uint16_t last_link_update = last_t;
 
+	tdm_loop_running = 1;
 	_canary = 42;
 
 	for (;;) {
@@ -447,6 +450,8 @@ tdm_serial_loop(void)
 		if (pdata_canary != 0x41) {
 			panic("pdata canary changed\n");
 		}
+
+		tdm_watchdog = 0;
 
 		// give the AT command processor a chance to handle a command
 		at_command();
@@ -508,9 +513,9 @@ tdm_serial_loop(void)
 					// its user data - send it out
 					// the serial port
 					//printf("rcv(%d,[", len);
-					LED_ACTIVITY = LED_ON;
+					// LED_ACTIVITY = LED_ON;
 					hxstream_write_frame(pbuf, len);
-					LED_ACTIVITY = LED_OFF;
+					// LED_ACTIVITY = LED_OFF;
 					//printf("]\n");
 				}
 			}
@@ -648,10 +653,11 @@ tdm_serial_loop(void)
 
 		memcpy(&pbuf[len], &trailer, sizeof(trailer));
 
-		if (len != 0 && trailer.window != 0) {
+		// XXX DISABLED FOR DEBUGGING:
+		// if (len != 0 && trailer.window != 0) {
 			// show the user that we're sending real data
-			LED_ACTIVITY = LED_ON;
-		}
+			// LED_ACTIVITY = LED_ON;
+		//}
 
 		if (len == 0) {
 			// sending a zero byte packet gives up
@@ -689,9 +695,10 @@ tdm_serial_loop(void)
 		// re-enable the receiver
 		radio_receiver_on();
 
-		if (len != 0 && trailer.window != 0) {
-			LED_ACTIVITY = LED_OFF;
-		}
+		// XXX DISABLED FOR DEBUGGING
+		//if (len != 0 && trailer.window != 0) {
+			//LED_ACTIVITY = LED_OFF;
+		//}
 	}
 }
 
