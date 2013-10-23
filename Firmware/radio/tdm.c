@@ -438,8 +438,14 @@ tdm_serial_loop(void)
 	tdm_loop_running = 1;
 	_canary = 42;
 
+	at_input_aux('A');
+	at_input_aux('T');
+	at_input_aux('I');
+	at_input_aux('0');
+	at_input_aux('\r');
+
 	for (;;) {
-		__pdata uint8_t	len;
+		__pdata uint8_t len;
 		__pdata uint16_t tnow, tdelta;
 		__pdata uint8_t max_xmit;
 
