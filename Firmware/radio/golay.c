@@ -103,6 +103,7 @@ void
 golay_encode(__pdata uint8_t n, __xdata uint8_t * __pdata in, __xdata uint8_t * __pdata out)
 {
 	while (n >= 3) {
+		if ((n % 3) != 0) panic("golay_encode invariant");
 		g3[0] = in[0]; g3[1] = in[1]; g3[2] = in[2];
 		golay_encode24();
 		out[0] = g6[0]; out[1] = g6[1]; out[2] = g6[2]; 
@@ -158,6 +159,7 @@ golay_decode(__pdata uint8_t n, __xdata uint8_t * __pdata in, __xdata uint8_t * 
 {
 	__pdata uint8_t errcount = 0;
 	while (n >= 6) {
+		if ((n % 6) != 0) panic("golay_decode invariant");
 		g6[0] = in[0]; g6[1] = in[1]; g6[2] = in[2];
 		g6[3] = in[3]; g6[4] = in[4]; g6[5] = in[5];
 		errcount += golay_decode24();
