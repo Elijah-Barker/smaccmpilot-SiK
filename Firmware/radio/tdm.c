@@ -513,9 +513,9 @@ tdm_serial_loop(void)
 					// its user data - send it out
 					// the serial port
 					//printf("rcv(%d,[", len);
-					// LED_ACTIVITY = LED_ON;
+					LED_ACTIVITY = LED_ON;
 					hxstream_write_frame(pbuf, len);
-					// LED_ACTIVITY = LED_OFF;
+					LED_ACTIVITY = LED_OFF;
 					//printf("]\n");
 				}
 			}
@@ -653,11 +653,10 @@ tdm_serial_loop(void)
 
 		memcpy(&pbuf[len], &trailer, sizeof(trailer));
 
-		// XXX DISABLED FOR DEBUGGING:
-		// if (len != 0 && trailer.window != 0) {
-			// show the user that we're sending real data
-			// LED_ACTIVITY = LED_ON;
-		//}
+		if (len != 0 && trailer.window != 0) {
+			//bshow the user that we're sending real data
+			LED_ACTIVITY = LED_ON;
+		}
 
 		if (len == 0) {
 			// sending a zero byte packet gives up
@@ -695,10 +694,9 @@ tdm_serial_loop(void)
 		// re-enable the receiver
 		radio_receiver_on();
 
-		// XXX DISABLED FOR DEBUGGING
-		//if (len != 0 && trailer.window != 0) {
-			//LED_ACTIVITY = LED_OFF;
-		//}
+		if (len != 0 && trailer.window != 0) {
+			LED_ACTIVITY = LED_OFF;
+		}
 	}
 }
 
