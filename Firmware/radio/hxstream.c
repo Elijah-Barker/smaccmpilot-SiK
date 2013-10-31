@@ -76,7 +76,7 @@
 
 struct frame {
 	uint8_t len;
-	uint8_t data[HX_FRAMELEN];
+	uint8_t fdata[HX_FRAMELEN];
 };
 
 struct frame_builder {
@@ -163,7 +163,7 @@ bool hxstream_rx_handler(uint8_t c) {
 			rx_frame = &rx_term;
 			if (frame_rx(c, rx_frame, &rx_fbuilder)) {
 				for (i = 0; i < rx_term.len; i++) {
-					at_input_aux(rx_term.data[i]);
+					at_input_aux(rx_term.fdata[i]);
 				}
 			}
 		}
@@ -213,7 +213,7 @@ static bool frame_rx (uint8_t c,
 				off = fb->offs;
 				if (off < HX_FRAMELEN) {
 					// Ordinary byte onto the frame:
-					f->data[off] = c;
+					f->fdata[off] = c;
 					fb->offs = off + 1;
 				} else {
 					// Error, no more room to store data.
@@ -232,7 +232,7 @@ static bool frame_rx (uint8_t c,
 				off = fb->offs;
 				if (off < HX_FRAMELEN) {
 					// Escaped byte onto the frame:
-					f->data[off] = HX_ESC(c);
+					f->fdata[off] = HX_ESC(c);
 					fb->offs = off + 1;
 					fb->state = HX_STATE_DATA;
 				} else {
@@ -311,7 +311,7 @@ static bool frame_tx (__xdata struct frame *f,
 			}
 			o = fb->offs;
 			fb->offs = o + 1;
-			d = f->data[o];
+			d = f->fdata[o];
 			if (d == HX_FBO || d == HX_CEO) {
 				TX_PUT(HX_CEO);
 				fb->state = HX_STATE_ESC;
@@ -321,7 +321,7 @@ static bool frame_tx (__xdata struct frame *f,
 			break;
 		case HX_STATE_ESC:
 			o = fb->offs;
-			d = f->data[o-1];
+			d = f->fdata[o-1];
 			TX_PUT(HX_ESC(d));
 			fb->state = HX_STATE_DATA;
 			break;
@@ -332,7 +332,7 @@ static bool frame_tx (__xdata struct frame *f,
 			}
 			o = fb->offs;
 			fb->offs = o + 1;
-			d = f->data[o];
+			d = f->fdata[o];
 			TX_PUT(d);
 	}
 	return false;
@@ -341,7 +341,7 @@ static bool frame_tx (__xdata struct frame *f,
 void hxstream_write_frame (__xdata uint8_t* __data buf, __pdata uint8_t count) {
 	// write frame to the hxstream transmit buffer
 	if (BUF_NOT_FULL(tx) && count <= HX_FRAMELEN) {
-		memcpy((BUF_AT_INSERT(tx))->data, buf, count);
+		memcpy((BUF_AT_INSERT(tx))->fdata, buf, count);
 		(BUF_AT_INSERT(tx))->len = count;
 		BUF_INSERT(tx);
 		errors.serial_tx_ok++;
@@ -355,7 +355,7 @@ void hxstream_write_frame (__xdata uint8_t* __data buf, __pdata uint8_t count) {
 bool hxstream_read_frame (__xdata uint8_t * __data buf, __pdata uint8_t count) {
 	// read a frame from the hxstream recieve buffer.
 	if (hxstream_read_available() == count) {
-		memcpy(buf, (BUF_AT_REMOVE(rx))->data, count);
+		memcpy(buf, (BUF_AT_REMOVE(rx))->fdata, count);
 		BUF_REMOVE(rx);
 		return true;
 	}
@@ -390,7 +390,7 @@ void hxstream_term_end_frame (void) {
 void hxstream_term_putchar(char c) {
 	if (tx_term_state == TERM_STATE_WRITE) {
 		if (tx_term.len < HX_FRAMELEN) {
-			tx_term.data[tx_term.len] = c;
+			tx_term.fdata[tx_term.len] = c;
 			tx_term.len++;
 		}
 	}
