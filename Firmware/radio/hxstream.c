@@ -101,13 +101,13 @@ struct frame_builder {
 
 __xdata static struct frame_builder rx_fbuilder;
 __xdata static struct frame         rx_buf[NUM_RX_FRAMES];
-__pdata static const  uint16_t      rx_mask = NUM_RX_FRAMES - 1;
-__xdata static volatile uint16_t    rx_insert, rx_remove;
+__pdata static const  uint8_t       rx_mask = NUM_RX_FRAMES - 1;
+ __data        volatile uint8_t     rx_insert, rx_remove;
 
 __xdata static struct frame_builder tx_fbuilder;
 __xdata static struct frame         tx_buf[NUM_TX_FRAMES];
-__pdata static const  uint16_t      tx_mask = NUM_TX_FRAMES - 1;
-__xdata static volatile uint16_t    tx_insert, tx_remove;
+__pdata static const  uint8_t       tx_mask = NUM_TX_FRAMES - 1;
+ __data        volatile uint8_t     tx_insert, tx_remove;
 
 __xdata static struct frame         tx_term;
 __xdata static uint8_t              tx_term_state;
