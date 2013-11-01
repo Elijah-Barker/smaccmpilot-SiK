@@ -46,4 +46,10 @@ void hxstream_term_putchar(char c);
 
 void hxstream_check_rts(void);
 
+// XXX DEBUG
+
+
+ __data extern volatile uint8_t     rx_insert, rx_remove;
+ __data extern volatile uint8_t     tx_insert, tx_remove;
+
 #endif // __HXSTREAM_H__

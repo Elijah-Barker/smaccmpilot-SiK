@@ -510,6 +510,10 @@ at_bin_stat(void)
 	put16  (errors.serial_tx_ok);             // 21, 22
 	put16  (errors.serial_rx_ok);             // 23, 24
 	putchar(errors.max_xmit);                 // 25
+	putchar(tx_insert);                       // 26
+	putchar(tx_remove);                       // 27
+	putchar(rx_insert);                       // 28
+	putchar(rx_remove);                       // 29
 	errors.max_xmit = 0;
 }
 
