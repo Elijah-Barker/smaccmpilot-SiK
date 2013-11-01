@@ -114,10 +114,10 @@ __xdata static uint8_t              tx_term_state;
 __xdata static struct frame         rx_term;
 
 static bool frame_rx (uint8_t c,
-		__xdata struct frame* f,
-		__xdata struct frame_builder* fb);
-static bool frame_tx (__xdata struct frame *f,
-		__xdata struct frame_builder *fb);
+		__xdata struct frame* __xdata f,
+		__xdata struct frame_builder* __xdata fb);
+static bool frame_tx (__xdata struct frame * __xdata f,
+		__xdata struct frame_builder * __xdata fb);
 
 void hxstream_init (void) {
 	INIT_FRAME_BUILDER(&rx_fbuilder);
@@ -173,8 +173,8 @@ bool hxstream_rx_handler(uint8_t c) {
 #pragma restore
 
 static bool frame_rx (uint8_t c,
-		__xdata struct frame* f,
-		__xdata struct frame_builder* fb)
+		__xdata struct frame* __xdata f,
+		__xdata struct frame_builder* __xdata fb)
 {
 	__xdata uint8_t off;
 	switch (fb->state) {
@@ -251,9 +251,9 @@ static bool frame_rx (uint8_t c,
 
 // Return value: true when nothing has been transmitted
 bool hxstream_tx_handler() {
-	__xdata struct frame *f;
-	bool complete = true;
-	bool transmitted = false;
+	__xdata struct frame * __xdata f;
+	bool complete;
+	bool transmitted;
 
 	complete = true;
 	transmitted = false;
@@ -291,8 +291,8 @@ bool hxstream_tx_handler() {
 	return (transmitted)?false:true;
 }
 
-static bool frame_tx (__xdata struct frame *f,
-		__xdata struct frame_builder *fb)
+static bool frame_tx (__xdata struct frame * __xdata f,
+		__xdata struct frame_builder * __xdata fb)
 {
 	__xdata uint8_t o,d;
 	switch (fb->state) {
