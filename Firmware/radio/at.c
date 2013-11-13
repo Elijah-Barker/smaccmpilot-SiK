@@ -60,7 +60,9 @@ static void	at_i(void);
 static void	at_s(void);
 static void	at_ampersand(void);
 static void	at_plus(void);
-static void	at_bin_stat(void);
+static void	at_bin_status(void);
+static void	at_bin_debug(void);
+static void	at_bin_common(void);
 
 #pragma save
 #pragma nooverlay
@@ -251,7 +253,10 @@ at_command(void)
 			}
 		} else if ((at_cmd_len == 1) && (at_cmd[0] == 'B')) {
 			hxstream_term_begin_frame();
-			at_bin_stat();
+			at_bin_status();
+		} else if ((at_cmd_len == 1) && (at_cmd[0] == 'D')) {
+			hxstream_term_begin_frame();
+			at_bin_debug();
 		}
 
 		hxstream_term_end_frame();
@@ -486,15 +491,34 @@ at_plus(void)
 
 }
 
+static void
+at_bin_status(void)
+{
+	putchar('B');                             // 0
+	at_bin_common();                          // 1..24
+}
+
+static void
+at_bin_debug(void)
+{
+	putchar('D');                             // 0
+	at_bin_common();                          // 1..24
+	putchar(errors.max_xmit);                 // 25
+	putchar(tx_insert);                       // 26
+	putchar(tx_remove);                       // 27
+	putchar(rx_insert);                       // 28
+	putchar(rx_remove);                       // 29
+	errors.max_xmit = 0;
+}
+
 #define put16(_v) do  { \
 	putchar( (uint8_t) (((_v) >> 8) & 0xFF) ); \
 	putchar( (uint8_t) (((_v) >> 0) & 0xFF) ); \
 	} while (0);
 
 static void
-at_bin_stat(void)
+at_bin_common(void)
 {
-	putchar('B');                             // 0
 	putchar(statistics.average_rssi);         // 1
 	putchar(statistics.average_noise);        // 2
 	put16  (statistics.receive_count);        // 3, 4
@@ -509,11 +533,5 @@ at_bin_stat(void)
 	put16  (errors.corrected_packets);        // 19, 20
 	put16  (errors.serial_tx_ok);             // 21, 22
 	put16  (errors.serial_rx_ok);             // 23, 24
-	putchar(errors.max_xmit);                 // 25
-	putchar(tx_insert);                       // 26
-	putchar(tx_remove);                       // 27
-	putchar(rx_insert);                       // 28
-	putchar(rx_remove);                       // 29
-	errors.max_xmit = 0;
 }
 
