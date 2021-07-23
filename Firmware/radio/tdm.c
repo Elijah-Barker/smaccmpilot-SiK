@@ -489,7 +489,7 @@ tdm_serial_loop(void)
 			// any more
 			transmit_wait = 0;
 
-			if (len < 2) {
+			if (len < 2 || len > MAX_PACKET_LENGTH) {
 				// not a valid packet. We always send
 				// two control bytes at the end of every packet
 				continue;
